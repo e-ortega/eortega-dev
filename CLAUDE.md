@@ -146,6 +146,8 @@ Errores en formato ProblemDetails (RFC 9457), que ASP.NET Core trae nativo.
 
 Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruiter 24 h), límites exactos de rate limiting, retención de `OtpRequests`/`ContactMessages`, y el contenido concreto de `/api/extras`.
 
+**Guía de construcción: [`docs/backend-guide.md`](docs/backend-guide.md)** (en inglés, por la regla de idioma). Milestones M0–M5 con criterios de "terminado", estructura de carpetas, paquetes, trampas conocidas y defaults propuestos para los pendientes de arriba (tabla "Decisions to confirm"). Es la fuente de verdad del plan: si Esteban cambia una decisión, se actualiza ahí. No contiene código C# (regla de autoría). Defaults propuestos ahí y aún no confirmados: backend en `api/` dentro de este repo, .NET 10 LTS, Minimal APIs con route groups.
+
 ## Diseño visual (decidido)
 
 - Mockup del Home hecho con el Artifact tool (tipo Design/canvas), aesthetic "blueprint / cuaderno de ingeniería": grilla sutil, IBM Plex Sans/Mono, paneles con borde fino sin sombra, acento azul (#2E5BFF editable). Aprobado como base.
