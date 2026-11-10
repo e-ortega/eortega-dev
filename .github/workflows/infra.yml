@@ -1,0 +1,87 @@
+name: Infra (Bicep)
+
+on:
+  push:
+    branches: [main]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  pull_request:
+    branches: [main]
+    paths: ["infra/**", ".github/workflows/infra.yml"]
+  workflow_dispatch:
+    inputs:
+      action:
+        description: "deploy = aplicar Bicep · destroy = borrar el Static Web App (escalar a 0)"
+        type: choice
+        options: [deploy, destroy]
+        default: deploy
+      confirm:
+        description: "Para destroy, escribir el nombre del Static Web App"
+        required: false
+
+permissions:
+  id-token: write # OIDC hacia Azure, sin secretos guardados
+  contents: read
+
+concurrency:
+  group: infra
+  cancel-in-progress: false
+
+env:
+  RG: ${{ vars.AZURE_RESOURCE_GROUP }}
+  SWA_NAME: ${{ vars.SWA_NAME }} # lo lee main.bicepparam
+
+jobs:
+  what-if:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: What-if
+        run: |
+          {
+            echo '### Bicep what-if'
+            echo '```'
+            az deployment group what-if -g "$RG" --parameters infra/main.bicepparam 2>&1
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  deploy:
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && inputs.action == 'deploy')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Deploy Bicep
+        run: |
+          az deployment group create -g "$RG" \
+            --name "swa-${{ github.run_number }}" \
+            --parameters infra/main.bicepparam \
+            --query properties.outputs -o json | tee outputs.json
+          echo "Hostname: $(jq -r .defaultHostname.value outputs.json)" >> "$GITHUB_STEP_SUMMARY"
+
+  destroy:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Confirmación
+        if: inputs.confirm != vars.SWA_NAME
+        run: |
+          echo "::error::Para destroy hay que escribir exactamente '${{ vars.SWA_NAME }}' en 'confirm'."
+          exit 1
+      - uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Borrar Static Web App
+        # Solo el recurso: el RG, la identidad y su rol se quedan, para poder recrear con "deploy".
+        run: az staticwebapp delete -n "$SWA_NAME" -g "$RG" --yes
