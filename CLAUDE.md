@@ -60,7 +60,8 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
   - El `az` de Windows emite CRLF: en Git Bash cada `$(az ...)` trae un `\r` pegado (rompía comparaciones y el appId). `bootstrap.sh` lo limpia con un wrapper de `az`. `gh` no estaba en el PATH del bash lanzado desde PowerShell; las variables del repo se cargaron desde otra shell.
   - El repo usa subjects OIDC inmutables (`use_immutable_subject`): GitHub firma con `repo:e-ortega@8528679/eortega-dev@1452146082:...`, no `repo:e-ortega/eortega-dev:...`. `bootstrap.sh` lee el prefijo real de `repos/{repo}/actions/oidc/customization/sub` y crea/actualiza las federated credentials con él.
   - El `disconnect` regeneró el token de deploy: el secreto del workflow generado por Azure quedó inválido. Ese workflow se deshabilitó (`gh workflow disable`, estado `disabled_manually`); el archivo se conserva como referencia.
-  - PR #1 validado: what-if con OIDC `pull_request` ✓, deploy de preview de `frontend.yml` ✓ (HTTP 200), producción intacta.
+  - PR #1 validado y mergeado: what-if con OIDC `pull_request` ✓, preview ✓, y en `main` `infra.yml` deploy ✓ + `frontend.yml` deploy a producción ✓ (OIDC `main-branch`). **El pipeline IaC está completo y en uso.**
+  - Al mergear, el evento "closed" del PR llega con `github.ref = refs/heads/main` y caía en el mismo grupo de concurrencia que el push → canceló el deploy a producción (se relanzó a mano). Corregido: grupo por evento + número de PR, y `cancel-in-progress` solo para PRs.
 - Importante al recrear desde cero (después de un destroy): el hostname `*.azurestaticapps.net` cambia, así que hay que actualizar el CNAME `@` en Cloudflare y el TXT de validación del dominio. Con el proxy naranja activo, la validación TXT del dominio raíz es la que aplica.
 
 ## Páginas del portal
@@ -95,7 +96,6 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
 
 ## Pendiente / sin decidir
 
-- Mergear PR #1 y verificar el primer deploy a producción desde `main` (credencial OIDC `main-branch`, `infra.yml` deploy + `frontend.yml`).
 - Cambiar el A record de `www` a CNAME.
 - Contenido real: trayectoria (hardware @ Intel → backend → DevOps/platform engineering, docencia), stack con más detalle, y explicación de cada proyecto (CanastaCRApp, pipeline de telemetría).
 - Sin decidir: si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo.

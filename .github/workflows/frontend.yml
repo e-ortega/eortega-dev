@@ -15,8 +15,11 @@ permissions:
   pull-requests: write # para que el deploy comente la URL del preview en el PR
 
 concurrency:
-  group: frontend-${{ github.ref }}
-  cancel-in-progress: true
+  # Por PR o por rama. Ojo: al mergear, el evento "closed" del PR llega con github.ref = refs/heads/main,
+  # así que agrupar solo por github.ref hacía que el cierre del preview cancelara el deploy a producción.
+  group: frontend-${{ github.event_name }}-${{ github.event.pull_request.number || github.ref }}
+  # Solo se cancelan builds viejos de un mismo PR; un deploy a producción nunca se corta a la mitad.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   RG: ${{ vars.AZURE_RESOURCE_GROUP }}
