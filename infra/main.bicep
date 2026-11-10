@@ -41,9 +41,10 @@ resource swa 'Microsoft.Web/staticSites@2023-12-01' = {
     stagingEnvironmentPolicy: 'Enabled' // previews por PR (el tier Free permite hasta 3)
     allowConfigFileUpdates: true
     // Intencionalmente sin repositoryUrl/branch: el recurso no queda atado al repo desde el portal
-    // (se desconectó con `az staticwebapp disconnect`). No se declara deploymentAuthPolicy: Azure
-    // rechaza cambiarla sin un PAT de GitHub ("Cannot update policy without providing repository
-    // token"), así que queda la que tenga el recurso; frontend.yml manda token + github_id_token.
+    // (se desconectó con `az staticwebapp disconnect`).
+    // deploymentAuthPolicy no se declara: ARM solo deja cambiarla con un PAT de GitHub + buildProperties.
+    // Se puso en 'DeploymentToken' una vez a mano (ver CLAUDE.md). Un recurso NUEVO creado por este
+    // template ya nace sin repo, así que usa token por defecto.
   }
 }
 

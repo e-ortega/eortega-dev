@@ -56,10 +56,11 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
 - El workflow que Azure generó al crear el recurso desde el portal (`azure-static-web-apps-polite-hill-0de7df110.yml`, usa el secreto `AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_HILL_0DE7DF110`) se conserva en el repo como referencia, por decisión de Esteban — no borrarlo. Mientras esté activo, cada push a main dispara dos deploys del frontend (el viejo y `frontend.yml`); la opción para que quede solo como referencia es deshabilitarlo con `gh workflow disable` sin tocar el archivo.
 - Estado (10 nov 2026): bootstrap corrido y Bicep aplicado manualmente con éxito sobre el recurso existente (deployment `swa-manual-bootstrap`); sitio y dominio verificados después (HTTP 200, dominio `Ready`). Lecciones de esa primera corrida:
   - El recurso estaba conectado a GitHub (lo creó el portal). Se desconectó con `az staticwebapp disconnect` (lo corrió Esteban); ahora `provider: None`, sin repositoryUrl/branch.
-  - `deploymentAuthPolicy` quedó en `GitHub` y Azure no deja cambiarla sin un PAT ("Cannot update policy without providing repository token"), ni siquiera desconectado. Por eso Bicep no la declara y `frontend.yml` manda token de deploy + `github_id_token`.
+  - `deploymentAuthPolicy` quedó en `GitHub` tras el disconnect. Con esa política el deploy falla de las dos formas: con `github_id_token` el servidor busca el sitio por el nombre del archivo de workflow (exige `azure-static-web-apps-<adj>-<noun>-<hex>.yml`), y con solo el token responde "api key invalid". Se cambió a `DeploymentToken` una sola vez con `az rest --method patch` sobre el recurso, pasando `repositoryToken` (PAT fine-grained temporal, ya descartable) + `buildProperties` (appLocation `/`, outputLocation `dist`, `skipGithubActionWorkflowGeneration: true`); sin ambos ARM lo rechaza. Bicep no declara la propiedad por eso mismo. `frontend.yml` deploya solo con el token.
   - El `az` de Windows emite CRLF: en Git Bash cada `$(az ...)` trae un `\r` pegado (rompía comparaciones y el appId). `bootstrap.sh` lo limpia con un wrapper de `az`. `gh` no estaba en el PATH del bash lanzado desde PowerShell; las variables del repo se cargaron desde otra shell.
   - El repo usa subjects OIDC inmutables (`use_immutable_subject`): GitHub firma con `repo:e-ortega@8528679/eortega-dev@1452146082:...`, no `repo:e-ortega/eortega-dev:...`. `bootstrap.sh` lee el prefijo real de `repos/{repo}/actions/oidc/customization/sub` y crea/actualiza las federated credentials con él.
-  - El `disconnect` regeneró el token de deploy: el secreto del workflow generado por Azure quedó inválido ("No matching Static Web App was found or the api key was invalid").
+  - El `disconnect` regeneró el token de deploy: el secreto del workflow generado por Azure quedó inválido. Ese workflow se deshabilitó (`gh workflow disable`, estado `disabled_manually`); el archivo se conserva como referencia.
+  - PR #1 validado: what-if con OIDC `pull_request` ✓, deploy de preview de `frontend.yml` ✓ (HTTP 200), producción intacta.
 - Importante al recrear desde cero (después de un destroy): el hostname `*.azurestaticapps.net` cambia, así que hay que actualizar el CNAME `@` en Cloudflare y el TXT de validación del dominio. Con el proxy naranja activo, la validación TXT del dominio raíz es la que aplica.
 
 ## Páginas del portal
@@ -94,7 +95,7 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
 
 ## Pendiente / sin decidir
 
-- Validar los workflows nuevos en GitHub Actions (OIDC + deploy de `frontend.yml`) y decidir si se deshabilita el workflow generado por Azure (se conserva como referencia; tras el disconnect podría haber dejado de funcionar).
+- Mergear PR #1 y verificar el primer deploy a producción desde `main` (credencial OIDC `main-branch`, `infra.yml` deploy + `frontend.yml`).
 - Cambiar el A record de `www` a CNAME.
 - Contenido real: trayectoria (hardware @ Intel → backend → DevOps/platform engineering, docencia), stack con más detalle, y explicación de cada proyecto (CanastaCRApp, pipeline de telemetría).
 - Sin decidir: si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo.
