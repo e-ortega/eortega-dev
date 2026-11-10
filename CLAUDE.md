@@ -53,7 +53,7 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
 - `infra/main.bicep` (scope: resource group) + `infra/main.bicepparam`: Static Web App (SKU Free, previews por PR habilitados) y el dominio custom `eortega.dev`. El nombre del recurso viene de la variable de repo `SWA_NAME`.
 - `infra/bootstrap.sh`: lo que Bicep no maneja, se corre una vez desde Git Bash con sesión en la cuenta personal: crea el RG, una app registration `github-actions-eortega-dev` con federated credentials OIDC (rama main + pull_request, sin secretos), rol **Contributor solo sobre el RG** (no sobre la suscripción PAYG), y las variables del repo (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `SWA_NAME`). Detecta el Static Web App existente para que Bicep lo adopte en vez de crear otro.
 - `.github/workflows/infra.yml`: what-if en PRs que tocan `infra/`, deploy en push a main, y `workflow_dispatch` con `deploy` / `destroy` (destroy borra solo el Static Web App, pide escribir su nombre para confirmar; RG e identidad se quedan para poder recrear).
-- `.github/workflows/frontend.yml`: build con Node 20 (`npm ci && npm run build`) y deploy de `dist/` con `Azure/static-web-apps-deploy`. El token de deploy se pide a Azure en cada corrida vía OIDC, así que recrear el recurso no exige actualizar secretos. Previews por PR y cierre al cerrar el PR.
+- `.github/workflows/frontend.yml`: build con Node 22 LTS (`npm ci && npm run build`) y deploy de `dist/` con `Azure/static-web-apps-deploy`. El token de deploy se pide a Azure en cada corrida vía OIDC, así que recrear el recurso no exige actualizar secretos. Previews por PR y cierre al cerrar el PR.
 - El workflow que Azure generó al crear el recurso desde el portal (`azure-static-web-apps-polite-hill-0de7df110.yml`, usa el secreto `AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_HILL_0DE7DF110`) se conserva en el repo como referencia, por decisión de Esteban — no borrarlo. Mientras esté activo, cada push a main dispara dos deploys del frontend (el viejo y `frontend.yml`); la opción para que quede solo como referencia es deshabilitarlo con `gh workflow disable` sin tocar el archivo.
 - Estado (10 nov 2026): bootstrap corrido y Bicep aplicado manualmente con éxito sobre el recurso existente (deployment `swa-manual-bootstrap`); sitio y dominio verificados después (HTTP 200, dominio `Ready`). Lecciones de esa primera corrida:
   - El recurso estaba conectado a GitHub (lo creó el portal). Se desconectó con `az staticwebapp disconnect` (lo corrió Esteban); ahora `provider: None`, sin repositoryUrl/branch.
@@ -145,7 +145,7 @@ Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruit
 
 ## Estado del frontend
 
-- Vite + React 18 scaffolded a mano (sin `npm create vite`, para no arriesgar el CLAUDE.md). Fuentes IBM Plex vía Google Fonts en `index.html`.
+- Vite 8 (+ @vitejs/plugin-react 6) + React 18, scaffolded a mano (sin `npm create vite`, para no arriesgar el CLAUDE.md). Fuentes IBM Plex vía Google Fonts en `index.html`.
 - Componentes en `src/components/` (Header, Hero, Projects, About, Contact, Footer) replicando el mockup, CSS modules por componente, tokens de color/tipografía en `src/index.css`.
 - Proyectos en `src/data/projects.js` como arreglo estático (CanastaCRApp en producción, Pipeline de Telemetría en construcción) — placeholder intencional hasta que exista la API.
 - El backend NO existe todavía, a propósito (regla de autoría).

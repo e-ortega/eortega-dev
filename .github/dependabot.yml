@@ -1,0 +1,16 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    # 0 = sin PRs de versiones nuevas "porque sí"; las actualizaciones de seguridad siguen llegando.
+    open-pull-requests-limit: 0
+    groups:
+      # vite y su plugin de React tienen que subir juntos: el plugin declara la versión de vite que
+      # soporta como peer dependency, y subir solo vite rompe `npm ci` (pasó con vite 5 → 8).
+      vite:
+        applies-to: security-updates
+        patterns:
+          - "vite"
+          - "@vitejs/*"
