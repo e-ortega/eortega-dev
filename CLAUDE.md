@@ -156,6 +156,7 @@ Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruit
 - Componentes en `src/components/` (Header, Hero, Projects, About, Contact, Footer) replicando el mockup, CSS modules por componente, tokens de color/tipografía en `src/index.css`.
 - Proyectos en `src/data/projects.js` como arreglo estático (CanastaCRApp en producción, Pipeline de Telemetría en construcción) — placeholder intencional hasta que exista la API.
 - El backend NO existe todavía, a propósito (regla de autoría).
+- `README.md` (en inglés) con tres diagramas Mermaid: arquitectura, CI/CD y flujo de acceso de reclutadores. Lo que aún no existe va con línea punteada (`classDef planned`) y marcado *planned*. Mantenerlo al día cuando cambie la arquitectura (p. ej. quitar el *planned* cuando el backend esté desplegado).
 
 ## Pendiente / sin decidir
 

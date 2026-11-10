@@ -1,8 +1,8 @@
 import { useState } from "react";
 import styles from "./Hero.module.css";
 
-export default function Hero({ disponible = true }) {
-  const [isAvailable] = useState(disponible);
+export default function Hero({ available = true }) {
+  const [isAvailable] = useState(available);
 
   return (
     <section className={styles.hero}>
