@@ -97,6 +97,7 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
 ## Pendiente / sin decidir
 
 - Cambiar el A record de `www` a CNAME.
+- Futuro (sin urgencia mientras todo esté en tier Free, $0): poder apagar los recursos desde el pipeline. Hoy ya existe `infra.yml` → `workflow_dispatch` → `destroy` (borra el Static Web App), pero recrear implica actualizar CNAME/TXT en Cloudflare a mano. Pendiente diseñar un "apagar/encender" más completo (p. ej. automatizar el DNS de Cloudflare con su API, y extenderlo a los recursos del backend cuando existan).
 - Contenido real: trayectoria (hardware @ Intel → backend → DevOps/platform engineering, docencia), stack con más detalle, y explicación de cada proyecto (CanastaCRApp, pipeline de telemetría).
 - Sin decidir: si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo.
 - Backend (Esteban): ASP.NET Core + JWT, aprovisionar la VM de Oracle, `cloudflared` para `api.eortega.dev`, health-check anti-reclamo, y conectar Projects a la API real.
