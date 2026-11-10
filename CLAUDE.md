@@ -34,7 +34,8 @@ División de trabajo explícita:
 - DNS en Cloudflare:
   - CNAME `@` → `polite-hill-0de7df110.5.azurestaticapps.net`, **Proxied** (naranja), SSL/TLS mode **Full**, IPv6 Compatibility **desactivado**.
   - TXT `@` de validación del dominio custom de Static Web Apps.
-  - A `www` → 20.75.112.13 (IP fija de Azure, auto-creado por Cloudflare). Pendiente: cambiarlo a CNAME hacia el hostname de Static Web Apps para no depender de esa IP.
+  - CNAME `www` → `eortega.dev`, **Proxied** (10 nov 2026; antes era un A a 20.75.112.13, una IP de Azure). La redirección la hace una Cloudflare Redirect Rule (plantilla "Redirect from WWW to root", 301 a `https://eortega.dev/...` preservando el path) en el borde: Azure no conoce `www` (responde 404 a ese Host), así que el registro solo existe para que Cloudflare atienda el host y **tiene que seguir Proxied**. Apunta a la raíz y no a Azure para sobrevivir a un destroy/recreate del Static Web App.
+  - `http://www.eortega.dev` responde 404 (la regla solo matchea https). Impacto real casi nulo porque `.dev` está en la lista HSTS preload (los navegadores siempre usan https), pero se arregla activando "Always Use HTTPS" en SSL/TLS → Edge Certificates.
 - Por qué Proxied (fix del 10 nov 2026): el sitio no cargaba en laptops Windows (Chrome/Edge) pero sí en iPhone. Causa probable: registros AAAA vía Cloudflare + Windows prefiriendo IPv6 por una ruta que fallaba en esa red. Con Proxied + IPv6 Compatibility off quedó resuelto.
 - TLS: el borde lo sirve Cloudflare; Azure además gestiona su certificado del dominio custom (renovación automática).
 
@@ -96,7 +97,8 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
 
 ## Pendiente / sin decidir
 
-- Cambiar el A record de `www` a CNAME.
+- Activar "Always Use HTTPS" en Cloudflare (cierra el 404 de `http://www`).
+- Siguiente foco: pensar/diseñar el backend antes que el contenido real (decisión de Esteban, 10 nov 2026).
 - Futuro (sin urgencia mientras todo esté en tier Free, $0): poder apagar los recursos desde el pipeline. Hoy ya existe `infra.yml` → `workflow_dispatch` → `destroy` (borra el Static Web App), pero recrear implica actualizar CNAME/TXT en Cloudflare a mano. Pendiente diseñar un "apagar/encender" más completo (p. ej. automatizar el DNS de Cloudflare con su API, y extenderlo a los recursos del backend cuando existan).
 - Contenido real: trayectoria (hardware @ Intel → backend → DevOps/platform engineering, docencia), stack con más detalle, y explicación de cada proyecto (CanastaCRApp, pipeline de telemetría).
 - Sin decidir: si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo.
