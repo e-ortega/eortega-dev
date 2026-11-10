@@ -2,7 +2,7 @@
 
 ## Qué es esto
 
-Portal personal de portafolio para mostrar los proyectos de Esteban (incluido telemetry-pipeline una vez listo). Nombre tentativo de dominio: eortega.dev (disponibilidad sin confirmar todavía).
+Portal personal de portafolio para mostrar los proyectos de Esteban (incluido telemetry-pipeline una vez listo). En vivo en **https://eortega.dev**.
 
 ## Regla de autoría
 
@@ -13,17 +13,52 @@ División de trabajo explícita:
 
 ## Stack decidido
 
-- Frontend: React (Vite)
+- Frontend: React 18 (Vite)
 - Backend: ASP.NET Core Web API (stack habitual de Esteban) con JWT
 
 ## Hosting y presupuesto (decidido)
 
-- **Frontend**: Azure Static Web Apps, tier gratuito — CDN, SSL y CI/CD con GitHub Actions incluidos, sin tocar crédito
-- **Backend**: VM Always Free de Oracle Cloud (VM.Standard.A1.Flex, 2 OCPU / 12GB RAM, ARM) corriendo el backend en Docker. Se eligió sobre Azure Container Apps porque el portal debe estar siempre disponible para reclutadores sin demora de cold-start — una VM real no tiene ese problema, a diferencia de un plan serverless que escala a cero. Costo: $0 de por vida.
+- **Frontend**: Azure Static Web Apps, SKU Free ($0), en la cuenta **personal** de Azure (eortega1793@hotmail.com, suscripción Pay-As-You-Go), resource group `eortega-dev`, región **Central US** (tanto el RG como el Static Web App; antes este archivo decía West Europe por error). Al ser PAYG: no añadir recursos facturables sin confirmarlo explícitamente.
+  - No se usa la suscripción "Azure for Students" (tenant ULatina): tiene una Azure Policy institucional que solo permite belgiumcentral, switzerlandnorth, norwayeast, germanywestcentral, spaincentral, y Static Web Apps solo existe en centralus, eastus2, westus2, westeurope, eastasia — cero intersección. Esteban podría modificar esa política pero decidió no tocarla.
+  - Ojo: el `az` local por defecto queda logueado en la cuenta de ULatina. Para operar el portal hay que `az login` / `az account set` a la suscripción personal.
+- **Backend**: VM Always Free de Oracle Cloud (VM.Standard.A1.Flex, 2 OCPU / 12GB RAM, ARM) corriendo el backend en Docker. Se eligió sobre Azure Container Apps porque el portal debe estar siempre disponible para reclutadores sin demora de cold-start. Costo: $0 de por vida.
   - Riesgo a mitigar: Oracle puede reclamar la instancia si se mantiene con menos del 20% de uso de CPU/red durante 7 días seguidos. Se resuelve con un health-check programado que la toque periódicamente.
-- **Evaluado y descartado**: Hostinger plan Premium (shared/cloud hosting) — no soporta ASP.NET Core, solo PHP/Node en servidores Linux sin runtime .NET. Hostinger VPS (KVM 1, ~$6.29-13.79/mes) sí funcionaría técnicamente vía Docker, pero se descartó a favor de la opción gratuita de Oracle.
-- **Dominio**: revisar primero si Esteban califica para el GitHub Student Developer Pack (dominio gratis 1 año vía Name.com, incluye extensión .dev) antes de comprarlo. Alternativa de pago: Porkbun, ~$8.75 primer año / $12.87 renovación para .dev, o $11.81/año fijo para .com. Comprar aparte del hosting, no vía Azure ni Hostinger, para no atar el dominio a un proveedor de infraestructura.
-- Esteban tiene una cuenta Azure for Students con $100 USD de crédito, reservado para el proyecto telemetry-pipeline (SQL Server, Log Analytics), no para el portal.
+  - Exposición: Cloudflare Tunnel (`cloudflared`) hacia `api.eortega.dev` — sin abrir puertos ni manejar IP pública/firewall, SSL gestionado en el borde.
+- **Evaluado y descartado**: Hostinger Premium (shared hosting, no soporta ASP.NET Core) y Hostinger VPS (funcionaría vía Docker, pero se prefirió la opción gratuita de Oracle).
+- La cuenta Azure for Students ($100 USD de crédito) queda reservada para telemetry-pipeline (SQL Server, Log Analytics), no para el portal.
+
+## Dominio y DNS (en vivo)
+
+- **eortega.dev** registrado en **Cloudflare Registrar** ($8.20 primer año / $12.20 renovación), vence el 9 nov 2027, auto-renovación activada. Se eligió Cloudflare sobre Porkbun principalmente por Cloudflare Tunnel gratis para el backend. Cloudflare Registrar obliga a usar su DNS, lo cual no es problema.
+  - Descartado: dominio gratis vía GitHub Student Developer Pack (la cuenta estebanortega-ulatina está verificada como Faculty, no Student; la cuenta e-ortega no tiene beneficio educativo). También descartados Name.com (renovaciones infladas) y el "dominio gratis" de Hostinger (atado a su hosting).
+- DNS en Cloudflare:
+  - CNAME `@` → `polite-hill-0de7df110.5.azurestaticapps.net`, **Proxied** (naranja), SSL/TLS mode **Full**, IPv6 Compatibility **desactivado**.
+  - TXT `@` de validación del dominio custom de Static Web Apps.
+  - A `www` → 20.75.112.13 (IP fija de Azure, auto-creado por Cloudflare). Pendiente: cambiarlo a CNAME hacia el hostname de Static Web Apps para no depender de esa IP.
+- Por qué Proxied (fix del 10 nov 2026): el sitio no cargaba en laptops Windows (Chrome/Edge) pero sí en iPhone. Causa probable: registros AAAA vía Cloudflare + Windows prefiriendo IPv6 por una ruta que fallaba en esa red. Con Proxied + IPv6 Compatibility off quedó resuelto.
+- TLS: el borde lo sirve Cloudflare; Azure además gestiona su certificado del dominio custom (renovación automática).
+
+## Email del dominio (configurado y probado)
+
+- Cloudflare Email Routing activo, catch-all (y hola@) reenviando a eortega1793@hotmail.com.
+- Un solo registro SPF (`include:_spf.mx.cloudflare.net`). Hubo un conflicto inicial por tener además un `v=spf1 -all` viejo; se borró — no volver a agregar un segundo SPF.
+- DMARC `p=reject` con alineación estricta (adkim=s; aspf=s), soportado por el DKIM que Cloudflare auto-generó (`cf2024-1._domainkey`).
+- Confirmado con correo de prueba real el 10 nov 2026.
+
+## Infraestructura como código + CI/CD
+
+Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear limpio durante la etapa de desarrollo.
+
+- `infra/main.bicep` (scope: resource group) + `infra/main.bicepparam`: Static Web App (SKU Free, previews por PR habilitados) y el dominio custom `eortega.dev`. El nombre del recurso viene de la variable de repo `SWA_NAME`.
+- `infra/bootstrap.sh`: lo que Bicep no maneja, se corre una vez desde Git Bash con sesión en la cuenta personal: crea el RG, una app registration `github-actions-eortega-dev` con federated credentials OIDC (rama main + pull_request, sin secretos), rol **Contributor solo sobre el RG** (no sobre la suscripción PAYG), y las variables del repo (`AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `AZURE_RESOURCE_GROUP`, `SWA_NAME`). Detecta el Static Web App existente para que Bicep lo adopte en vez de crear otro.
+- `.github/workflows/infra.yml`: what-if en PRs que tocan `infra/`, deploy en push a main, y `workflow_dispatch` con `deploy` / `destroy` (destroy borra solo el Static Web App, pide escribir su nombre para confirmar; RG e identidad se quedan para poder recrear).
+- `.github/workflows/frontend.yml`: build con Node 20 (`npm ci && npm run build`) y deploy de `dist/` con `Azure/static-web-apps-deploy`. El token de deploy se pide a Azure en cada corrida vía OIDC, así que recrear el recurso no exige actualizar secretos. Previews por PR y cierre al cerrar el PR.
+- El workflow que Azure generó al crear el recurso desde el portal (`azure-static-web-apps-polite-hill-0de7df110.yml`, usa el secreto `AZURE_STATIC_WEB_APPS_API_TOKEN_POLITE_HILL_0DE7DF110`) se conserva en el repo como referencia, por decisión de Esteban — no borrarlo. Mientras esté activo, cada push a main dispara dos deploys del frontend (el viejo y `frontend.yml`); la opción para que quede solo como referencia es deshabilitarlo con `gh workflow disable` sin tocar el archivo.
+- Estado (10 nov 2026): bootstrap corrido y Bicep aplicado manualmente con éxito sobre el recurso existente (deployment `swa-manual-bootstrap`); sitio y dominio verificados después (HTTP 200, dominio `Ready`). Lecciones de esa primera corrida:
+  - El recurso estaba conectado a GitHub (lo creó el portal). Se desconectó con `az staticwebapp disconnect` (lo corrió Esteban); ahora `provider: None`, sin repositoryUrl/branch.
+  - `deploymentAuthPolicy` quedó en `GitHub` y Azure no deja cambiarla sin un PAT ("Cannot update policy without providing repository token"), ni siquiera desconectado. Por eso Bicep no la declara y `frontend.yml` manda token de deploy + `github_id_token`.
+  - El `az` de Windows emite CRLF: en Git Bash cada `$(az ...)` trae un `\r` pegado (rompía comparaciones y el appId). `bootstrap.sh` lo limpia con un wrapper de `az`. `gh` no estaba en el PATH del bash lanzado desde PowerShell; las variables del repo se cargaron desde otra shell.
+- Importante al recrear desde cero (después de un destroy): el hostname `*.azurestaticapps.net` cambia, así que hay que actualizar el CNAME `@` en Cloudflare y el TXT de validación del dominio. Con el proxy naranja activo, la validación TXT del dominio raíz es la que aplica.
 
 ## Páginas del portal
 
@@ -44,28 +79,21 @@ División de trabajo explícita:
 - `GET /api/projects` → público
 - `POST /api/projects/{id}`, `PUT /api/projects/{id}`, `DELETE /api/projects/{id}` → protegidos con JWT
 
-## Pendiente / sin decidir todavía
+## Diseño visual (decidido)
 
-- Tono visual del portal: sobrio/corporate vs. con más personalidad — no decidido
-- Si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo — no decidido
-- Aprovisionar la VM de Oracle Cloud y configurar el health-check — no hecho todavía
+- Mockup del Home hecho con el Artifact tool (tipo Design/canvas), aesthetic "blueprint / cuaderno de ingeniería": grilla sutil, IBM Plex Sans/Mono, paneles con borde fino sin sombra, acento azul (#2E5BFF editable). Aprobado como base.
 
-## Dominio: decisión final
+## Estado del frontend
 
-Se descartó la ruta del dominio gratis vía GitHub Student Developer Pack: la cuenta estebanortega-ulatina tiene beneficios educativos verificados como **Faculty**, no como Student (confirmado en github.com/settings/education/benefits — solo desbloquea upgrade a GitHub Teams y Copilot, no el marketplace de partners con dominios). La cuenta personal e-ortega (Gmail) no tiene ningún beneficio educativo aplicado. Se compra el dominio directo en Porkbun (~$8.75 el primer año para .dev).
+- Vite + React 18 scaffolded a mano (sin `npm create vite`, para no arriesgar el CLAUDE.md). Fuentes IBM Plex vía Google Fonts en `index.html`.
+- Componentes en `src/components/` (Header, Hero, Projects, About, Contact, Footer) replicando el mockup, CSS modules por componente, tokens de color/tipografía en `src/index.css`.
+- Proyectos en `src/data/projects.js` como arreglo estático (CanastaCRApp en producción, Pipeline de Telemetría en construcción) — placeholder intencional hasta que exista la API.
+- El backend NO existe todavía, a propósito (regla de autoría).
 
-Dominio final: **eortega.dev**, comprado directo en Porkbun ($8.75 primer año / $12.87 renovación), standalone, sin bundle de hosting. Se revisaron y descartaron alternativas: eortegadev.* en Name.com (precios de entrada baratos pero renovaciones infladas en .life/.lol/.bio/.email), y el "dominio gratis" de Hostinger para eortegacr.dev (en realidad viene atado a comprar su plan de hosting Unlimited/Premium — el mismo hosting ya descartado por no soportar ASP.NET Core). El nombre exacto de la variante (eortega.dev vs. eortegacr.dev) no le importa a Esteban; se queda con eortega.dev por ser el que ya estaba confirmado disponible con precio transparente.
+## Pendiente / sin decidir
 
-## Registrador final: Cloudflare
-
-Decisión cerrada: **eortega.dev se registra en Cloudflare** ($8.20 primer año / $12.20 renovación), no en Porkbun. Motivo principal, más allá del precio: Cloudflare Tunnel (cloudflared) es gratis y resuelve la exposición del backend en la VM de Oracle sin abrir puertos ni manejar IP pública/firewall — el backend se conecta hacia afuera por un túnel cifrado hacia un subdominio (ej. api.eortega.dev), con SSL gestionado automáticamente en el borde.
-
-Implicación técnica: Cloudflare Registrar obliga a usar su propio DNS (no se puede usar otro proveedor mientras el dominio esté registrado ahí). No es un problema acá porque de todos modos se va a usar el DNS de Cloudflare para enrutar:
-- `eortega.dev` (raíz) → Azure Static Web Apps (frontend)
-- `api.eortega.dev` (o similar) → Cloudflare Tunnel hacia el backend en la VM Always Free de Oracle
-
-**Comprado y activo**: eortega.dev registrado en Cloudflare, vence el 9 de noviembre de 2027, auto-renovación activada ($12.20/año). Pendiente: configurar la zona DNS (raíz → Static Web Apps, api.eortega.dev → Cloudflare Tunnel) y, al aprovisionar la VM de Oracle, instalar `cloudflared` para el túnel.
-
-## Mockup visual (decidido)
-- Mockup del Home hecho con el Artifact tool (tipo Design/canvas), aesthetic "blueprint / cuaderno de ingeniería": grilla sutil, IBM Plex Sans/Mono, paneles con borde fino sin sombra, acento azul (#2E5BFF editable).
-- Aprobado como base por ahora. Pendiente: trabajar el contenido real — explicar su trayectoria (hardware @ Intel -> backend -> DevOps/platform engineering, docencia) y el stack con más detalle, y desarrollar la explicación de cada proyecto (CanastaCRApp, pipeline de telemetría) antes de construir el código React definitivo.
+- Validar los workflows nuevos en GitHub Actions (OIDC + deploy de `frontend.yml`) y decidir si se deshabilita el workflow generado por Azure (se conserva como referencia; tras el disconnect podría haber dejado de funcionar).
+- Cambiar el A record de `www` a CNAME.
+- Contenido real: trayectoria (hardware @ Intel → backend → DevOps/platform engineering, docencia), stack con más detalle, y explicación de cada proyecto (CanastaCRApp, pipeline de telemetría).
+- Sin decidir: si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo.
+- Backend (Esteban): ASP.NET Core + JWT, aprovisionar la VM de Oracle, `cloudflared` para `api.eortega.dev`, health-check anti-reclamo, y conectar Projects a la API real.
