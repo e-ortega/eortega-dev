@@ -63,24 +63,79 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
   - PR #1 validado: what-if con OIDC `pull_request` ✓, deploy de preview de `frontend.yml` ✓ (HTTP 200), producción intacta.
 - Importante al recrear desde cero (después de un destroy): el hostname `*.azurestaticapps.net` cambia, así que hay que actualizar el CNAME `@` en Cloudflare y el TXT de validación del dominio. Con el proxy naranja activo, la validación TXT del dominio raíz es la que aplica.
 
+## Backend: alcance decidido (10 nov 2026)
+
+Objetivo: mostrar dominio de varias tecnologías, no solo un CRUD. La autenticación se aprovecha con **dos flujos y dos roles**:
+
+| | Admin (Esteban) | Reclutador / persona interesada |
+|---|---|---|
+| Entrada | email + contraseña (hash) | código de un solo uso (OTP) por correo, sin contraseña |
+| Sesión | JWT rol `admin` | JWT rol `recruiter`, vida corta |
+| Puede | CRUD de proyectos, ver solicitudes de acceso y mensajes | ver el contenido extra |
+
+Decisiones:
+- **Todo el sitio es público.** El acceso de reclutador es un extra opcional, nunca un muro. Aviso tipo: "Reclutadores: implementamos autenticación con roles — solicitá acceso para ver contenido extra".
+- **Acceso automático** (sin aprobación de Esteban), con aviso a Esteban por cada solicitud: sirve además como registro de quién mira el portafolio.
+- **OTP de 6 dígitos, no magic link**: los escáneres de correo corporativos abren los links y consumen un link de un solo uso antes que la persona.
+- **Contenido extra = la propia auth funcionando**: la sesión del visitante por dentro (claims decodificados, rol, expiración, por qué cookie HttpOnly), diagrama del flujo que acaba de recorrer con links al código, demo en vivo de 401 vs 200 en un endpoint protegido, y un par de datos extra (CV en PDF, LinkedIn/teléfono directo, disponibilidad).
+- **Base de datos: PostgreSQL en Docker**, en la misma VM de Oracle que la API.
+
+Tecnologías que quedan a la vista: ASP.NET Core (authorization policies por rol, rate limiting nativo, health checks), EF Core + PostgreSQL (migraciones, arrays), JWT en cookie, Cloudflare Turnstile, correo transaccional (Resend) con SPF/DKIM/DMARC alineados, Docker Compose, Cloudflare Tunnel.
+
 ## Páginas del portal
 
-- Home: quién es, stack, enlace a proyectos destacados
-- Proyectos: lista que viene de la API (no hardcodeada en el frontend)
-- Sobre mí
-- Contacto: formulario que pega a la API
-- /admin: protegida con JWT, para dar de alta/editar proyectos sin re-deployar
+- Home, Proyectos, Sobre mí, Contacto — **públicas**. Proyectos viene de la API (no hardcodeado).
+- Aviso/CTA de acceso para reclutadores → pantalla de solicitar código (email + Turnstile) → pantalla de ingresar código.
+- `/extra` (rol `recruiter` o `admin`): contenido extra descrito arriba.
+- `/admin` (rol `admin`): CRUD de proyectos, solicitudes de acceso, mensajes de contacto.
 
-## Modelo de datos
+## Modelo de datos (PostgreSQL / EF Core)
 
-- `Projects`: nombre, descripción, stack, repo_url, demo_url, destacado
-- `Users`: solo la cuenta de admin de Esteban
+- `Users`: id, email (único), password_hash (solo admin; null para reclutadores), role (`admin` | `recruiter`), created_at, last_login_at. El usuario reclutador se crea al verificar su primer código.
+- `OtpRequests`: id, email, code_hash, expires_at, attempts, consumed_at, created_at, request_ip, country (header `CF-IPCountry`). Sirve también como log de "quién pidió acceso".
+- `Projects`: id, slug (único), name, description, stack (`text[]`), repo_url, demo_url, featured, status (`production` | `in_progress`), sort_order, created_at, updated_at.
+- `ContactMessages`: id, name, email, message, created_at, request_ip.
+- El admin se siembra desde configuración (email + hash por variable de entorno), no hay registro público de admin.
 
-## Contrato de API
+## Contrato de API (`https://api.eortega.dev`)
 
-- `POST /api/auth/login` → devuelve el JWT
-- `GET /api/projects` → público
-- `POST /api/projects/{id}`, `PUT /api/projects/{id}`, `DELETE /api/projects/{id}` → protegidos con JWT
+Auth — la sesión viaja en cookie, nunca en el body:
+- `POST /api/auth/login` `{email, password}` → 200 `{role, expiresAt}` + `Set-Cookie`; 401 genérico (no revela si el email existe).
+- `POST /api/auth/otp/request` `{email, turnstileToken}` → **202 siempre** (misma respuesta exista o no la cuenta). Rate limit por IP y por email + cooldown entre envíos. Envía el código por correo y avisa a Esteban.
+- `POST /api/auth/otp/verify` `{email, code}` → 200 `{role, expiresAt}` + `Set-Cookie`; 401 si es inválido o expiró; tras 5 intentos fallidos el código se invalida.
+- `POST /api/auth/logout` → 204, borra la cookie.
+- `GET /api/auth/me` → 200 `{email, role, issuedAt, expiresAt, claims}` | 401. Alimenta la vista "tu sesión por dentro": como la cookie es HttpOnly el frontend no puede leer el JWT, así que la API devuelve los claims decodificados (no el token crudo).
+
+Proyectos:
+- `GET /api/projects` (público, `?featured=true` opcional), `GET /api/projects/{slug}` (público).
+- `POST /api/projects`, `PUT /api/projects/{id}`, `DELETE /api/projects/{id}` → rol `admin`. (El contrato anterior decía `POST /api/projects/{id}`; crear va sin id.)
+
+Contacto:
+- `POST /api/contact` `{name, email, message, turnstileToken}` → 202. Se guarda y se avisa a Esteban por correo. Rate limit por IP.
+
+Contenido extra (rol `recruiter` o `admin`):
+- `GET /api/extras` → datos extra (LinkedIn, teléfono, disponibilidad, etc.).
+- `GET /api/extras/cv` → PDF servido por la API (no es un archivo público del frontend).
+- `GET /api/extras/protected-demo` → 200 con sesión, 401 sin ella (el frontend lo llama con y sin credenciales para la demo en vivo).
+
+Admin (rol `admin`):
+- `GET /api/admin/access-requests`, `GET /api/admin/contact-messages`.
+
+Operación:
+- `GET /health/live` (proceso arriba) y `GET /health/ready` (incluye PostgreSQL). Los usa el healthcheck de Docker y el health-check periódico anti-reclamo de Oracle.
+
+Errores en formato ProblemDetails (RFC 9457), que ASP.NET Core trae nativo.
+
+## Detalles de diseño a respetar
+
+- **Cookie**: `HttpOnly`, `Secure`, `SameSite=Lax`, host-only en `api.eortega.dev`. `eortega.dev` y `api.eortega.dev` son el mismo *site*, así que funciona; pero son orígenes distintos → CORS con `AllowCredentials` solo para `https://eortega.dev`. Consecuencia: en los previews de PR (`*.azurestaticapps.net`, otro site) el login no va a funcionar; es aceptable.
+- **Correo saliente (Resend)**: enviar desde el subdominio `send.eortega.dev` (ej. `no-reply@send.eortega.dev`), verificado en Resend con su propio SPF/DKIM. Así no se toca el SPF de la raíz (que es el de Email Routing y **no puede haber dos**), y con DMARC estricto (`adkim=s; aspf=s`) el From y la firma DKIM quedan en el mismo dominio exacto → alineado. El subdominio hereda `p=reject` vía `sp=reject`, así que si la verificación queda mal, los correos se rechazan en silencio: probar con un envío real antes de darlo por hecho. Los avisos a Esteban van a `hola@eortega.dev` (Email Routing los reenvía a Hotmail).
+- **OTP**: guardado como hash, expira a los 10 min, un solo uso, máx. 5 intentos.
+- **Abuso del endpoint de OTP** (alguien podría usarlo para bombardear correos ajenos y quemar la cuota/reputación del dominio): Turnstile + rate limiting obligatorios desde el día uno.
+- **Despliegue**: `docker compose` en la VM de Oracle con tres servicios: `api`, `postgres` (volumen persistente, **sin puerto expuesto**) y `cloudflared` (túnel a `api.eortega.dev`). Secretos (clave de firma JWT, API key de Resend, secret de Turnstile, contraseña de Postgres, hash del admin) en un archivo de entorno en la VM, nunca en el repo.
+- **Privacidad**: se guardan correos de terceros → aclararlo en la pantalla de solicitud de acceso (para qué se usan) y definir retención.
+
+Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruiter 24 h), límites exactos de rate limiting, retención de `OtpRequests`/`ContactMessages`, y el contenido concreto de `/api/extras`.
 
 ## Diseño visual (decidido)
 
