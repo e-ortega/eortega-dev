@@ -58,6 +58,8 @@ Pedido explícito de Esteban: reproducibilidad y poder "escalar a 0"/recrear lim
   - El recurso estaba conectado a GitHub (lo creó el portal). Se desconectó con `az staticwebapp disconnect` (lo corrió Esteban); ahora `provider: None`, sin repositoryUrl/branch.
   - `deploymentAuthPolicy` quedó en `GitHub` y Azure no deja cambiarla sin un PAT ("Cannot update policy without providing repository token"), ni siquiera desconectado. Por eso Bicep no la declara y `frontend.yml` manda token de deploy + `github_id_token`.
   - El `az` de Windows emite CRLF: en Git Bash cada `$(az ...)` trae un `\r` pegado (rompía comparaciones y el appId). `bootstrap.sh` lo limpia con un wrapper de `az`. `gh` no estaba en el PATH del bash lanzado desde PowerShell; las variables del repo se cargaron desde otra shell.
+  - El repo usa subjects OIDC inmutables (`use_immutable_subject`): GitHub firma con `repo:e-ortega@8528679/eortega-dev@1452146082:...`, no `repo:e-ortega/eortega-dev:...`. `bootstrap.sh` lee el prefijo real de `repos/{repo}/actions/oidc/customization/sub` y crea/actualiza las federated credentials con él.
+  - El `disconnect` regeneró el token de deploy: el secreto del workflow generado por Azure quedó inválido ("No matching Static Web App was found or the api key was invalid").
 - Importante al recrear desde cero (después de un destroy): el hostname `*.azurestaticapps.net` cambia, así que hay que actualizar el CNAME `@` en Cloudflare y el TXT de validación del dominio. Con el proxy naranja activo, la validación TXT del dominio raíz es la que aplica.
 
 ## Páginas del portal

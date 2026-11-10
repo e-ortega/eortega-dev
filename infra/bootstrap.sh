@@ -11,6 +11,9 @@ set -euo pipefail
 export MSYS_NO_PATHCONV=1 # Git Bash en Windows: no convertir "/subscriptions/..." en rutas de disco
 # El az de Windows emite CRLF: sin esto cada $(az ...) trae un \r pegado ("true\r", "<appId>\r").
 az() { command az "$@" | tr -d '\r'; }
+# Git Bash lanzado desde PowerShell no siempre tiene gh en el PATH.
+command -v gh >/dev/null || export PATH="$PATH:/c/Program Files/GitHub CLI"
+command -v gh >/dev/null || { echo "Falta gh (GitHub CLI) en el PATH"; exit 1; }
 
 REPO="e-ortega/eortega-dev"
 RG="eortega-dev"
@@ -55,20 +58,31 @@ az ad sp show --id "$APP_ID" -o none 2>/dev/null || az ad sp create --id "$APP_I
 
 echo "== Federated credentials (OIDC) =="
 add_cred() { # nombre subject
-  if az ad app federated-credential list --id "$APP_ID" --query "[?name=='$1'] | [0].name" -o tsv | grep -q .; then
-    echo "Ya existía: $1"
-  else
-    az ad app federated-credential create --id "$APP_ID" -o none --parameters "{
+  local params="{
       \"name\": \"$1\",
       \"issuer\": \"https://token.actions.githubusercontent.com\",
       \"subject\": \"$2\",
       \"audiences\": [\"api://AzureADTokenExchange\"]
     }"
+  local current
+  current=$(az ad app federated-credential list --id "$APP_ID" --query "[?name=='$1'] | [0].subject" -o tsv)
+  if [[ -z "$current" ]]; then
+    az ad app federated-credential create --id "$APP_ID" -o none --parameters "$params"
     echo "Creada: $1 -> $2"
+  elif [[ "$current" != "$2" ]]; then
+    az ad app federated-credential update --id "$APP_ID" --federated-credential-id "$1" -o none --parameters "$params"
+    echo "Actualizada: $1 -> $2 (antes: $current)"
+  else
+    echo "Ya existía: $1 -> $2"
   fi
 }
-add_cred "main-branch"  "repo:$REPO:ref:refs/heads/main"
-add_cred "pull-request" "repo:$REPO:pull_request"
+# El prefijo del subject depende de la config OIDC del repo: este repo usa subjects inmutables
+# ("repo:e-ortega@<owner_id>/eortega-dev@<repo_id>"), no el clásico "repo:e-ortega/eortega-dev".
+SUB_PREFIX=$(gh api "repos/$REPO/actions/oidc/customization/sub" --jq '.sub_claim_prefix // empty' 2>/dev/null || true)
+SUB_PREFIX="${SUB_PREFIX:-repo:$REPO}"
+echo "Prefijo del subject OIDC: $SUB_PREFIX"
+add_cred "main-branch"  "$SUB_PREFIX:ref:refs/heads/main"
+add_cred "pull-request" "$SUB_PREFIX:pull_request"
 
 echo "== Rol Contributor sobre el RG (solo el RG) =="
 if az role assignment list --assignee "$APP_ID" --scope "$RG_ID" --role Contributor --query "[0].id" -o tsv | grep -q .; then
