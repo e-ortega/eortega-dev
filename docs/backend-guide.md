@@ -6,21 +6,41 @@ Each milestone ends with a working, testable slice. Open one PR per milestone (o
 
 ---
 
-## 0. Decisions to confirm before starting
+## 0. Decisions
 
-These have a suggested default. Change them here if you disagree, so the guide stays the source of truth.
+All confirmed on 2026-11-10. If one changes, update it here so the guide stays the source of truth.
 
-| Topic | Suggested default | Why |
+| Topic | Decision | Why |
 |---|---|---|
-| Repo location | `api/` folder in this repo | One PR can change contract + API + frontend together; workflows already filter by path. |
-| Runtime | .NET 10 (LTS) | Current LTS; you already have the SDK. |
-| API style | Minimal APIs with route groups (`MapGroup`), organized by feature | Less ceremony than controllers, modern idiom, groups map 1:1 to the contract sections. Controllers are fine too if you prefer — just be consistent. |
+| Repo location | `api/` folder in this repo (Esteban creates it) | One PR can change contract + API + frontend together; workflows already filter by path. |
+| Runtime | .NET 10 (LTS) | Current LTS; the SDK is already installed. |
+| API style | Minimal APIs with route groups (`MapGroup`), organized by feature | Deliberate choice to practice Minimal APIs (day-to-day work uses controllers). See the mapping table below. |
 | Admin JWT lifetime | 8 h | A working session; no refresh tokens needed for one user. |
 | Recruiter JWT lifetime | 24 h | Long enough to browse, short enough to expire on its own. |
 | OTP request limits | 5/hour per IP, 3/hour per email, 60 s cooldown per email | Stops email bombing without bothering a real person. |
 | OTP verify limits | 10 per 15 min per IP; code dies after 5 wrong attempts | Brute-forcing 6 digits becomes impractical. |
 | Contact form limit | 5/hour per IP | |
 | Retention | `OtpRequests` 180 days, `ContactMessages` 1 year | State it on the request-access screen. |
+
+### Coming from controllers
+
+Where the usual controller concepts live in Minimal APIs (.NET 10):
+
+| Controllers | Minimal APIs |
+|---|---|
+| `[ApiController]` class + `[Route("api/projects")]` | `app.MapGroup("/api/projects")`, usually inside a static `MapProjectEndpoints` extension per feature |
+| Action methods | Handlers passed to `MapGet` / `MapPost` / …; prefer named static methods over inline lambdas so they stay readable and testable |
+| Constructor injection | Services injected as handler parameters |
+| `[FromBody]`, `[FromRoute]`, `[FromQuery]` | Inferred from the parameter type and route template; the attributes still exist when you need to be explicit |
+| `[Authorize(Policy = "...")]` | `.RequireAuthorization("...")` on the endpoint or on the whole group |
+| `[AllowAnonymous]` | `.AllowAnonymous()` |
+| `[EnableRateLimiting("...")]` | `.RequireRateLimiting("...")` |
+| `[EnableCors("...")]` | `.RequireCors("...")` |
+| Action filters | Endpoint filters (`.AddEndpointFilter(...)`) |
+| Automatic model validation (`[ApiController]` + DataAnnotations) | `builder.Services.AddValidation()` — new in .NET 10, validates DataAnnotations on Minimal API parameters and returns a 400 ValidationProblemDetails |
+| `IActionResult` / `ActionResult<T>` | `TypedResults` with a `Results<Ok<T>, NotFound>` return type — gives compile-time checking and accurate OpenAPI metadata |
+| `[ProducesResponseType]` | Inferred from the `Results<...>` return type |
+| Controller tests through `WebApplicationFactory` | Same — integration tests don't change |
 
 ---
 
