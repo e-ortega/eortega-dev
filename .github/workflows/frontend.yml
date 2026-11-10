@@ -51,19 +51,11 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
-      # El recurso conserva deploymentAuthPolicy=GitHub (no se puede cambiar sin PAT): se manda
-      # también el token OIDC de GitHub, igual que el workflow que generó Azure.
-      - name: GitHub ID token
-        id: idtoken
-        uses: actions/github-script@v7
-        with:
-          result-encoding: string
-          script: return await core.getIDToken()
-
+      # Solo el token de deploy, sin github_id_token: con id token, el servidor identifica el sitio
+      # por el nombre del archivo de workflow (exige azure-static-web-apps-<adj>-<noun>-<hex>.yml).
       - uses: Azure/static-web-apps-deploy@v1
         with:
           azure_static_web_apps_api_token: ${{ steps.swa.outputs.token }}
-          github_id_token: ${{ steps.idtoken.outputs.result }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: upload
           app_location: dist # ya compilado arriba
