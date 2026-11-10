@@ -8,9 +8,9 @@ export default function Header() {
           eortega.dev
         </a>
         <nav className={styles.links}>
-          <a href="#proyectos">Proyectos</a>
-          <a href="#sobre-mi">Sobre mí</a>
-          <a href="#contacto">Contacto</a>
+          <a href="#projects">Proyectos</a>
+          <a href="#about">Sobre mí</a>
+          <a href="#contact">Contacto</a>
         </nav>
       </div>
     </header>

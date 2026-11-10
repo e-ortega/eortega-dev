@@ -10,16 +10,16 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: "deploy = aplicar Bicep · destroy = borrar el Static Web App (escalar a 0)"
+        description: "deploy = apply Bicep · destroy = delete the Static Web App (scale to zero)"
         type: choice
         options: [deploy, destroy]
         default: deploy
       confirm:
-        description: "Para destroy, escribir el nombre del Static Web App"
+        description: "For destroy, type the Static Web App name"
         required: false
 
 permissions:
-  id-token: write # OIDC hacia Azure, sin secretos guardados
+  id-token: write # OIDC to Azure, no stored secrets
   contents: read
 
 concurrency:
@@ -28,7 +28,7 @@ concurrency:
 
 env:
   RG: ${{ vars.AZURE_RESOURCE_GROUP }}
-  SWA_NAME: ${{ vars.SWA_NAME }} # lo lee main.bicepparam
+  SWA_NAME: ${{ vars.SWA_NAME }} # read by main.bicepparam
 
 jobs:
   what-if:
@@ -72,16 +72,16 @@ jobs:
     if: github.event_name == 'workflow_dispatch' && inputs.action == 'destroy'
     runs-on: ubuntu-latest
     steps:
-      - name: Confirmación
+      - name: Confirmation
         if: inputs.confirm != vars.SWA_NAME
         run: |
-          echo "::error::Para destroy hay que escribir exactamente '${{ vars.SWA_NAME }}' en 'confirm'."
+          echo "::error::To destroy, type exactly '${{ vars.SWA_NAME }}' in 'confirm'."
           exit 1
       - uses: azure/login@v2
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-      - name: Borrar Static Web App
-        # Solo el recurso: el RG, la identidad y su rol se quedan, para poder recrear con "deploy".
+      - name: Delete Static Web App
+        # Only the resource: the RG, the identity and its role assignment stay, so "deploy" can recreate it.
         run: az staticwebapp delete -n "$SWA_NAME" -g "$RG" --yes

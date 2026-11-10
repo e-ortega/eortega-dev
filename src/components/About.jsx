@@ -2,7 +2,7 @@ import styles from "./About.module.css";
 
 export default function About() {
   return (
-    <section id="sobre-mi">
+    <section id="about">
       <div className="wrap">
         <h2 className="section-title mono">// sobre mí</h2>
         <div className={styles.copy}>

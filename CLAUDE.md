@@ -11,6 +11,13 @@ División de trabajo explícita:
 - **Claude** ayuda con la generación del frontend: estructura, diseño, scaffold de React, configuración de deployment/CI. Esto es presentación, no la pieza que demuestra código propio.
 - **Esteban** construye el backend de este servicio: la API, la autenticación JWT, el acceso a datos. Claude ayuda a diseñar el contrato de la API y revisa cuando hay código (igual que en telemetry-pipeline: solo hallazgos, nunca corrige), pero no escribe la implementación del backend.
 
+## Regla de idioma
+
+- **Este CLAUDE.md puede estar en español.**
+- **Todo lo demás va en inglés**: código, identificadores (incluidos IDs/anchors HTML como `#about`), comentarios, mensajes de scripts, nombres y descripciones de workflows, mensajes de commit, títulos y descripciones de PRs, y cualquier documentación del repo (README, docs/). Es el estándar y el público objetivo son mayormente multinacionales.
+- Excepción temporal: el **texto visible del sitio** sigue en español hasta implementar i18n (ver pendientes); con i18n pasa a archivos de traducción por idioma.
+- El historial de git anterior a esta regla (10 nov 2026) quedó en español; no se reescribe.
+
 ## Stack decidido
 
 - Frontend: React 18 (Vite)
@@ -154,6 +161,7 @@ Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruit
 
 - Activar "Always Use HTTPS" en Cloudflare (cierra el 404 de `http://www`).
 - Siguiente foco: pensar/diseñar el backend antes que el contenido real (decisión de Esteban, 10 nov 2026).
+- **i18n del frontend** (después): selector de idioma (al menos español / inglés), sacar todo el texto visible a archivos de traducción, `<html lang>` dinámico. Encaja con la regla de idioma: hoy el texto del sitio es el único lugar que sigue en español.
 - Futuro (sin urgencia mientras todo esté en tier Free, $0): poder apagar los recursos desde el pipeline. Hoy ya existe `infra.yml` → `workflow_dispatch` → `destroy` (borra el Static Web App), pero recrear implica actualizar CNAME/TXT en Cloudflare a mano. Pendiente diseñar un "apagar/encender" más completo (p. ej. automatizar el DNS de Cloudflare con su API, y extenderlo a los recursos del backend cuando existan).
 - Contenido real: trayectoria (hardware @ Intel → backend → DevOps/platform engineering, docencia), stack con más detalle, y explicación de cada proyecto (CanastaCRApp, pipeline de telemetría).
 - Sin decidir: si el portal lanza mostrando solo CanastaCRApp o espera a tener algo de telemetry-pipeline listo.

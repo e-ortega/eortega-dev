@@ -10,14 +10,14 @@ export default function Contact() {
     try {
       await navigator.clipboard.writeText(EMAIL);
     } catch (e) {
-      // noop — igual mostramos el estado "Copiado" para no bloquear al usuario
+      // noop — still show the "copied" state so the user is not blocked
     }
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   }
 
   return (
-    <section id="contacto">
+    <section id="contact">
       <div className="wrap">
         <h2 className="section-title mono">// contacto</h2>
         <p className={styles.lead}>
