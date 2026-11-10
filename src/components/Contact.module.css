@@ -1,0 +1,30 @@
+.lead {
+  color: var(--ink-soft);
+  font-size: 15.5px;
+  max-width: 520px;
+  margin: 0 0 24px;
+}
+
+.box {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid var(--line);
+  background: var(--paper-raised);
+  padding: 14px 18px;
+  font-size: 14.5px;
+}
+
+.box button {
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--ink);
+  font-size: 12.5px;
+  font-family: "IBM Plex Sans", sans-serif;
+  padding: 5px 10px;
+  cursor: pointer;
+}
+
+.box button:hover {
+  border-color: var(--ink-soft);
+}
