@@ -1,13 +1,13 @@
-// Infraestructura del frontend de eortega.dev: Azure Static Web App (+ dominios custom).
-// Scope: resource group. El RG y la identidad de despliegue se crean una sola vez con
-// infra/bootstrap.sh; este template solo maneja lo que vive DENTRO del RG, para que la
-// identidad de GitHub Actions no necesite permisos a nivel de suscripción (es PAYG).
+// Frontend infrastructure for eortega.dev: Azure Static Web App (+ custom domains).
+// Scope: resource group. The RG and the deployment identity are created once by
+// infra/bootstrap.sh; this template only manages what lives INSIDE the RG, so the
+// GitHub Actions identity never needs subscription-level permissions (it's Pay-As-You-Go).
 targetScope = 'resourceGroup'
 
-@description('Nombre del recurso Static Web App (no el hostname *.azurestaticapps.net).')
+@description('Static Web App resource name (not the *.azurestaticapps.net hostname).')
 param name string
 
-@description('Regiones donde Static Web Apps existe como plataforma.')
+@description('Regions where Static Web Apps is available as a platform.')
 @allowed([
   'centralus'
   'eastus2'
@@ -17,14 +17,14 @@ param name string
 ])
 param location string = 'centralus'
 
-@description('Free = $0. Standard tiene costo mensual: no cambiar sin decidirlo explícitamente.')
+@description('Free = $0. Standard has a monthly cost: do not change without an explicit decision.')
 @allowed([
   'Free'
   'Standard'
 ])
 param sku string = 'Free'
 
-@description('Dominios custom. Un dominio raíz (ej. eortega.dev) se valida con TXT; un subdominio con CNAME.')
+@description('Custom domains. An apex domain (e.g. eortega.dev) is validated via TXT; a subdomain via CNAME.')
 param customDomains array = []
 
 param tags object = {}
@@ -38,24 +38,24 @@ resource swa 'Microsoft.Web/staticSites@2023-12-01' = {
     tier: sku
   }
   properties: {
-    stagingEnvironmentPolicy: 'Enabled' // previews por PR (el tier Free permite hasta 3)
+    stagingEnvironmentPolicy: 'Enabled' // per-PR previews (the Free tier allows up to 3)
     allowConfigFileUpdates: true
-    // Intencionalmente sin repositoryUrl/branch: el recurso no queda atado al repo desde el portal
-    // (se desconectó con `az staticwebapp disconnect`).
-    // deploymentAuthPolicy no se declara: ARM solo deja cambiarla con un PAT de GitHub + buildProperties.
-    // Se puso en 'DeploymentToken' una vez a mano (ver CLAUDE.md). Un recurso NUEVO creado por este
-    // template ya nace sin repo, así que usa token por defecto.
+    // Intentionally no repositoryUrl/branch: the resource is not linked to the repo through the
+    // portal (it was detached with `az staticwebapp disconnect`).
+    // deploymentAuthPolicy is not declared: ARM only allows changing it with a GitHub PAT plus
+    // buildProperties. It was set to 'DeploymentToken' once, manually (see CLAUDE.md). A NEW
+    // resource created by this template has no repo link, so it uses token auth by default.
   }
 }
 
-// De a uno: las operaciones de dominio del mismo Static Web App chocan si corren en paralelo.
+// One at a time: custom domain operations on the same Static Web App conflict when run in parallel.
 @batchSize(1)
 resource domains 'Microsoft.Web/staticSites/customDomains@2023-12-01' = [
   for domain in customDomains: {
     parent: swa
     name: domain
     properties: {
-      // Heurística simple de "es raíz": dos etiquetas (eortega.dev). No cubre TLDs tipo .co.cr.
+      // Simple "is apex" heuristic: two labels (eortega.dev). Does not handle TLDs like .co.cr.
       validationMethod: length(split(domain, '.')) == 2 ? 'dns-txt-token' : 'cname-delegation'
     }
   }

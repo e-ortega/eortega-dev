@@ -3,7 +3,7 @@ import styles from "./Projects.module.css";
 
 export default function Projects() {
   return (
-    <section id="proyectos">
+    <section id="projects">
       <div className="wrap">
         <h2 className="section-title mono">// proyectos</h2>
         <div className={styles.grid}>

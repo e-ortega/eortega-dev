@@ -1,5 +1,5 @@
-// Datos estáticos por ahora — cuando exista el backend (ASP.NET Core),
-// esto se reemplaza por una llamada a GET /api/projects.
+// Static data for now — once the backend (ASP.NET Core) exists,
+// this is replaced by a call to GET /api/projects.
 export const projects = [
   {
     id: "canasta-cr-app",
