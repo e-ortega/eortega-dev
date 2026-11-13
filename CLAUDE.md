@@ -10,6 +10,7 @@ División de trabajo explícita:
 
 - **Claude** ayuda con la generación del frontend: estructura, diseño, scaffold de React, configuración de deployment/CI. Esto es presentación, no la pieza que demuestra código propio.
 - **Esteban** construye el backend de este servicio: la API, la autenticación JWT, el acceso a datos. Claude ayuda a diseñar el contrato de la API y revisa cuando hay código (igual que en telemetry-pipeline: solo hallazgos, nunca corrige), pero no escribe la implementación del backend.
+- **Esteban también hace la migración del frontend a TypeScript** (ver la sección "Migración del frontend a TypeScript"). Desde el 13 nov 2026 esa migración deja de ser trabajo de Claude: el frontend que Claude generó es el punto de partida, pero convertirlo a TypeScript lo escribe Esteban. Claude solo explica conceptos, ayuda a planificar el orden de trabajo y revisa lo que Esteban escriba (solo hallazgos, nunca corrige ni convierte archivos por él).
 
 ## Regla de idioma
 
@@ -20,7 +21,7 @@ División de trabajo explícita:
 
 ## Stack decidido
 
-- Frontend: React 18 (Vite)
+- Frontend: React 18 (Vite), **en migración a TypeScript** (la hace Esteban, ver más abajo)
 - Backend: ASP.NET Core Web API (stack habitual de Esteban) con JWT
 
 ## Hosting y presupuesto (decidido)
@@ -90,6 +91,46 @@ Decisiones:
 - **Base de datos: PostgreSQL en Docker**, en la misma VM de Oracle que la API.
 
 Tecnologías que quedan a la vista: ASP.NET Core (authorization policies por rol, rate limiting nativo, health checks), EF Core + PostgreSQL (migraciones, arrays), JWT en cookie, Cloudflare Turnstile, correo transaccional (Resend) con SPF/DKIM/DMARC alineados, Docker Compose, Cloudflare Tunnel.
+
+## Migración del frontend a TypeScript (decidido, 13 nov 2026)
+
+**Por qué:** el mercado que busca Esteban es full-stack (React + TypeScript con un backend propio), y su resume hoy no demuestra TypeScript. Principio rector de los proyectos de portafolio: cada proyecto existe para **respaldar con evidencia lo que dice el resume** y cerrar brechas concretas, no para sumar cosas nuevas sin criterio. Este portal es la evidencia de full-stack: React + TypeScript en el frontend y un ASP.NET Core API propio, con CI/CD e infraestructura como código ya en marcha.
+
+**Quién lo hace:** Esteban, a mano. Claude no escribe, convierte ni corrige archivos de esta migración. Rol de Claude: explicar (TypeScript con ejemplos concretos, a ritmo lento), ayudar a planificar el orden y revisar el resultado (solo hallazgos). Es la misma regla que en telemetry-pipeline.
+
+**Plan de trabajo (orden sugerido, ajustable por Esteban):**
+
+1. Instalar `typescript`, `@types/react` y `@types/react-dom`, y crear el `tsconfig.json` (Esteban lo escribe; empezar con `allowJs: true` para migrar de a poco, y apuntar a `strict: true` al final).
+2. Convertir de abajo hacia arriba: primero `src/data/projects.js` a `projects.ts` con tipos propios, luego los componentes hoja (Footer, Contact), después los demás, y al final `App.jsx` y `main.jsx` (renombrar a `.tsx`).
+3. Tipar los datos que vendrán de la API usando el contrato de la sección "Contrato de API" (los tipos del frontend deben reflejar los DTOs del backend).
+4. Agregar `tsc --noEmit` como paso de CI (en el workflow de build) para que un error de tipos falle el pipeline.
+5. Después: pruebas con Vitest y, si hay tiempo, un flujo end-to-end con Playwright.
+
+**Reglas:** cambios pequeños (un componente o un grupo por commit/PR), mensajes de commit y PRs en inglés (regla de idioma), sin cambiar el diseño ni el comportamiento durante la migración, y sin `any` salvo con un comentario que explique por qué. Esteban documenta en el README cómo usó IA durante el proceso (tutor y revisor, no autora del código).
+
+**Estado:** sin empezar (13 nov 2026).
+
+## Objetivo de perfil: full-stack (decidido, 13 nov 2026)
+
+**Titular:** "Full-stack engineer: backend .NET/C# y frontend React con TypeScript, con experiencia en CI/CD y cloud". DevOps pasa de ser una segunda identidad a ser el diferenciador (quien escribe código y también lo lleva a producción). El resume de DevOps queda como variante solo para ofertas de DevOps.
+
+**Qué implica para este portal:** es la evidencia principal del titular. Para que sea creíble, el frontend tiene que demostrar full-stack real y no solo "React básico". Checklist de evidencia (se marca al terminar cada punto, y solo entonces se agrega al resume):
+
+- [ ] TypeScript estricto (`strict: true`) en todo el frontend.
+- [ ] Routing (React Router): Home, Projects, About, Contact y `/admin` protegida.
+- [ ] Consumo de la API propia con tipos que reflejan los DTOs, y manejo de estados de carga, error y vacío (por ejemplo con TanStack Query).
+- [ ] Flujo de autenticación contra el backend con cookie `HttpOnly`: login, ruta protegida y expiración de sesión.
+- [ ] Formularios con validación (contacto y solicitud de acceso con OTP y Turnstile).
+- [ ] Pruebas: componentes con Vitest y Testing Library, y al menos un flujo end-to-end con Playwright, corriendo en CI.
+- [ ] Accesibilidad básica: navegación por teclado, contraste y una auditoría con axe o Lighthouse.
+- [ ] Rendimiento: puntaje razonable en Lighthouse y revisión del tamaño del bundle.
+- [ ] i18n español/inglés (ya está en pendientes).
+
+**Quién lo hace:** todo lo de esa lista lo escribe Esteban. Claude explica con ejemplos concretos y revisa (solo hallazgos). La IA es tutor y revisor de lo que Esteban escribe, y el README documenta cómo se usó.
+
+**Next.js:** no es parte del portal (es una SPA en Static Web Apps). Si las ofertas lo siguen pidiendo, se hace un ejercicio pequeño aparte cuando el checklist esté avanzado. Sin decidir.
+
+**Regla de honestidad:** nada va al resume hasta que esté hecho y publicado. Mientras tanto, en entrevistas se puede decir "estoy migrando el frontend a TypeScript", pero no se lista como habilidad dominada.
 
 ## Páginas del portal
 
@@ -161,9 +202,11 @@ Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruit
 - Proyectos en `src/data/projects.js` como arreglo estático (CanastaCRApp en producción, Pipeline de Telemetría en construcción) — placeholder intencional hasta que exista la API.
 - El backend NO existe todavía, a propósito (regla de autoría).
 - `README.md` (en inglés) con tres diagramas Mermaid: arquitectura, CI/CD y flujo de acceso de reclutadores. Lo que aún no existe va con línea punteada (`classDef planned`) y marcado *planned*. Mantenerlo al día cuando cambie la arquitectura (p. ej. quitar el *planned* cuando el backend esté desplegado).
+- Hoy todo está en JSX. La migración a TypeScript la hace Esteban (sección "Migración del frontend a TypeScript").
 
 ## Pendiente / sin decidir
 
+- **Migrar el frontend a TypeScript (Esteban)**: ver la sección dedicada. Es prioridad por su objetivo de perfil full-stack.
 - Activar "Always Use HTTPS" en Cloudflare (cierra el 404 de `http://www`).
 - Siguiente foco: pensar/diseñar el backend antes que el contenido real (decisión de Esteban, 10 nov 2026).
 - **i18n del frontend** (después): selector de idioma (al menos español / inglés), sacar todo el texto visible a archivos de traducción, `<html lang>` dinámico. Encaja con la regla de idioma: hoy el texto del sitio es el único lugar que sigue en español.
