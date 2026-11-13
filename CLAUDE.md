@@ -187,6 +187,10 @@ Errores en formato ProblemDetails (RFC 9457), que ASP.NET Core trae nativo.
 
 Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruiter 24 h), límites exactos de rate limiting, retención de `OtpRequests`/`ContactMessages`, y el contenido concreto de `/api/extras`.
 
+**Guía de construcción: [`docs/backend-guide.md`](docs/backend-guide.md)** (en inglés, por la regla de idioma). Milestones M0–M5 con criterios de "terminado", estructura de carpetas, paquetes, trampas conocidas y defaults propuestos para los pendientes de arriba (tabla "Decisions to confirm"). Es la fuente de verdad del plan: si Esteban cambia una decisión, se actualiza ahí. No contiene código C# (regla de autoría).
+
+**Decisiones confirmadas (10 nov 2026):** backend en `api/` dentro de este repo (lo crea Esteban); .NET 10 LTS; **Minimal APIs** con route groups — elegidas a propósito para practicarlas, Esteban normalmente trabaja con controllers (la guía tiene una tabla de equivalencias controllers → Minimal APIs); JWT admin 8 h / recruiter 24 h; rate limits (OTP request 5/h por IP, 3/h por email, cooldown 60 s; verify 10 por 15 min por IP, código muere a los 5 intentos; contacto 5/h por IP); retención `OtpRequests` 180 días, `ContactMessages` 1 año. Sigue abierto: el contenido concreto de `/api/extras`.
+
 ## Diseño visual (decidido)
 
 - Mockup del Home hecho con el Artifact tool (tipo Design/canvas), aesthetic "blueprint / cuaderno de ingeniería": grilla sutil, IBM Plex Sans/Mono, paneles con borde fino sin sombra, acento azul (#2E5BFF editable). Aprobado como base.
@@ -197,6 +201,7 @@ Pendiente de definir: duración exacta de cada JWT (sugerido: admin 8 h, recruit
 - Componentes en `src/components/` (Header, Hero, Projects, About, Contact, Footer) replicando el mockup, CSS modules por componente, tokens de color/tipografía en `src/index.css`.
 - Proyectos en `src/data/projects.js` como arreglo estático (CanastaCRApp en producción, Pipeline de Telemetría en construcción) — placeholder intencional hasta que exista la API.
 - El backend NO existe todavía, a propósito (regla de autoría).
+- `README.md` (en inglés) con tres diagramas Mermaid: arquitectura, CI/CD y flujo de acceso de reclutadores. Lo que aún no existe va con línea punteada (`classDef planned`) y marcado *planned*. Mantenerlo al día cuando cambie la arquitectura (p. ej. quitar el *planned* cuando el backend esté desplegado).
 - Hoy todo está en JSX. La migración a TypeScript la hace Esteban (sección "Migración del frontend a TypeScript").
 
 ## Pendiente / sin decidir
